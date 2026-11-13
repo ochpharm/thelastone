@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>약배송 예약 및 관리 시스템</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans KR & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900">
+
+    <!-- 전체 앱 컨테이너 (모바일 앱 비율 및 데스크톱 중앙 정렬) -->
+    <div class="min-h-screen flex flex-col max-w-2xl mx-auto bg-white shadow-xl border-x border-slate-200">
+        
+        <!-- 상단 헤더 & 모드 전환 스위치 -->
+        <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 sm:px-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                    <div id="header-icon-bg" class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm transition-colors duration-300">
+                        <!-- 약국 십자가 SVG 아이콘 -->
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold tracking-tight text-slate-900 leading-tight">오천약국 안심 약배송</h1>
+                        <p id="header-subtitle" class="text-xs font-medium text-emerald-600">약국 관리자 및 고객 접수 모드</p>
+                    </div>
+                </div>
+
+                <!-- 모드 선택 토글 버튼 (약국 모드 vs 배송원 모드) -->
+                <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button id="btn-mode-pharmacy" onclick="switchMode('pharmacy')" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all bg-white text-emerald-700 shadow-sm">
+                        <span>🏥</span> 약국 모드
+                    </button>
+                    <button id="btn-mode-driver" onclick="switchMode('driver')" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700">
+                        <span>🛵</span> 배송원 모드
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- ===================================================================== -->
+        <!-- 1. 약국 모드 영역 (탭: 목록 / 예약하기)                               -->
+        <!-- ===================================================================== -->
+        <main id="view-pharmacy" class="flex-1 flex flex-col">
+            <!-- 약국 모드 서브 탭 네비게이션 (목록 / 예약하기 2개 탭) -->
+            <nav class="grid grid-cols-2 border-b border-slate-200 bg-slate-50/70">
+                <button id="tab-pharmacy-list" onclick="switchPharmacyTab('list')" class="py-3.5 text-xs sm:text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 bg-white transition-all flex items-center justify-center gap-1.5">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    목록
+                    <span id="pharmacy-badge-count" class="px-1.5 py-0.5 text-[11px] rounded-full bg-emerald-100 text-emerald-800">0</span>
+                </button>
+                <button id="tab-pharmacy-reserve" onclick="switchPharmacyTab('reserve')" class="py-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-all flex items-center justify-center gap-1.5">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    예약하기
+                </button>
+            </nav>
+
+            <!-- [약국 탭 1] 예약 목록 조회 -->
+            <section id="section-pharmacy-list" class="p-4 sm:p-6 space-y-4 flex-1">
+                <!-- 상단 안내 및 상태 필터 바 (첨부 이미지 스타일 적용) -->
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-emerald-50/80 border border-emerald-100 px-4 py-3 rounded-2xl">
+                    <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700">
+                        <span>📅</span>
+                        <span>예약 날짜/시간 순으로 자동 정렬됩니다.</span>
+                    </div>
+                    <select id="filter-status" onchange="renderPharmacyList()" class="text-xs sm:text-sm font-bold bg-white border border-slate-200 text-slate-700 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm cursor-pointer">
+                        <option value="ALL">전체 상태 보기</option>
+                        <option value="PENDING">배송대기만 보기</option>
+                        <option value="COMPLETED">배송완료만 보기</option>
+                    </select>
+                </div>
+
+                <!-- 예약 목록 카드 컨테이너 -->
+                <div id="pharmacy-list-container" class="space-y-3.5">
+                    <!-- JS로 예약 목록 렌더링 -->
+                </div>
+            </section>
+
+            <!-- [약국 탭 2] 예약하기 (손님 직접 입력 및 스스로 수정 탭 포함) -->
+            <section id="section-pharmacy-reserve" class="hidden p-4 sm:p-6 flex-1 space-y-4">
+                <!-- 예약하기 내부 전환 탭: 신규 입력 vs 손님 스스로 수정하기 -->
+                <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                    <button type="button" id="subtab-reserve-new" onclick="setReserveSubMode('new')" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold bg-white text-emerald-700 shadow-sm transition-all">
+                        ✍️ 신규 약배송 예약하기
+                    </button>
+                    <button type="button" id="subtab-reserve-edit" onclick="setReserveSubMode('edit')" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 transition-all">
+                        ✏️ 내 예약 정보 수정하기
+                    </button>
+                </div>
+
+                <!-- 수정 탭 선택 시 노출되는 손님 선택 영역 -->
+                <div id="reserve-edit-selector-box" class="hidden bg-amber-50/90 border border-amber-200 rounded-2xl p-4 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="inline-block px-2.5 py-0.5 bg-amber-100 text-amber-800 text-xs font-bold rounded-lg">고객 스스로 정보 수정</span>
+                        <span class="text-[11px] font-semibold text-amber-700">수정할 예약 건을 선택하세요</span>
+                    </div>
+                    <select id="reserve-select-customer" onchange="loadCustomerIntoReserveForm(this.value)" class="w-full text-xs sm:text-sm font-bold bg-white border border-amber-300 text-slate-800 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm cursor-pointer">
+                        <option value="">수정할 본인의 이름/연락처를 선택하세요</option>
+                    </select>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-sm">
+                    <div class="mb-5 pb-4 border-b border-slate-200">
+                        <span id="reserve-mode-badge" class="inline-block px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg mb-1.5">신규 예약 등록</span>
+                        <h2 id="reserve-form-heading" class="text-lg font-bold text-slate-900">약배송 정보 입력</h2>
+                        <p id="reserve-form-desc" class="text-xs text-slate-500 mt-1">정확한 처방약 배송을 위해 아래 항목을 빠짐없이 입력해 주세요.</p>
+                    </div>
+
+                    <form id="reservation-form" onsubmit="handleReservationSubmit(event)" class="space-y-5">
+                        <input type="hidden" id="reserve-edit-id" value="">
+
+                        <!-- 1. 이름 -->
+                        <div>
+                            <label for="input-name" class="block text-sm font-bold text-slate-700 mb-1.5">
+                                1. 이름 <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="text" id="input-name" placeholder="예: 홍길동" required
+                                class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+                        </div>
+
+                        <!-- 2. 주민등록번호 7자리 (000000-0 형식) -->
+                        <div>
+                            <label for="input-rrn" class="block text-sm font-bold text-slate-700 mb-1.5">
+                                2. 주민등록번호 앞 7자리 <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="relative flex items-center bg-white rounded-xl border border-slate-300 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition">
+                                <!-- 실시간 000000-0 가이드 오버레이 -->
+                                <div id="rrn-visual-guide" aria-hidden="true" class="pointer-events-none absolute left-4 font-mono text-base font-bold tracking-wider select-none">
+                                    <span class="text-transparent" id="rrn-typed-mirror"></span><span class="text-slate-400" id="rrn-placeholder-tail">000000-0</span>
+                                </div>
+                                <input type="text" id="input-rrn" inputmode="numeric" maxlength="8" required
+                                    oninput="formatRRN(this)"
+                                    class="w-full px-4 py-3 rounded-xl bg-transparent text-slate-900 text-base font-bold tracking-wider font-mono focus:outline-none relative z-10">
+                                <span class="absolute right-3.5 text-xs text-slate-400 font-mono select-none">••••••</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-1">생년월일 6자리와 뒤 1자리를 입력하면 <strong class="font-mono text-slate-700">000000-0</strong> 형태로 자동 표시됩니다.</p>
+                        </div>
+
+                        <!-- 3. 연락처 -->
+                        <div>
+                            <label for="input-phone" class="block text-sm font-bold text-slate-700 mb-1.5">
+                                3. 연락처 (휴대폰 번호) <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="tel" id="input-phone" maxlength="13" placeholder="예: 010-1234-5678" required
+                                oninput="formatPhone(this)"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 font-mono placeholder:font-sans placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+                            <p class="text-[11px] text-slate-500 mt-1">배송 완료 시 인증사진과 안내 문자가 발송될 번호입니다.</p>
+                        </div>
+
+                        <!-- 4. 배송지 -->
+                        <div>
+                            <label for="input-address" class="block text-sm font-bold text-slate-700 mb-1.5">
+                                4. 배송지 주소 <span class="text-rose-500">*</span>
+                            </label>
+                            <textarea id="input-address" rows="2" placeholder="예: 서울시 강남구 테헤란로 123, 101동 502호 (공동현관 비밀번호: #1234)" required
+                                class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition resize-none"></textarea>
+                        </div>
+
+                        <!-- 저장 / 수정 완료 버튼 -->
+                        <div class="pt-2 flex gap-2.5">
+                            <button type="button" id="btn-cancel-reserve-edit" onclick="resetReserveFormToNew()" class="hidden w-1/3 py-3.5 px-4 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-xl transition text-sm">
+                                신규 입력으로
+                            </button>
+                            <button type="submit" id="btn-submit-reservation" class="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 text-base">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                <span id="btn-submit-reservation-text">예약 정보 저장하기</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- ===================================================================== -->
+        <!-- 2. 배송원 모드 영역 (탭: 배송대기 / 전체목록)                         -->
+        <!-- ===================================================================== -->
+        <main id="view-driver" class="hidden flex-1 flex flex-col">
+            <!-- 배송원 모드 서브 탭 네비게이션 -->
+            <nav class="grid grid-cols-2 border-b border-slate-200 bg-slate-50/70">
+                <button id="tab-driver-pending" onclick="switchDriverTab('pending')" class="py-3.5 text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-700 bg-white transition-all flex items-center justify-center gap-1.5">
+                    🛵 배송 대기
+                    <span id="driver-pending-count" class="px-1.5 py-0.5 text-[11px] rounded-full bg-blue-100 text-blue-800">0</span>
+                </button>
+                <button id="tab-driver-all" onclick="switchDriverTab('all')" class="py-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-all flex items-center justify-center gap-1.5">
+                    📋 전체 내역
+                </button>
+            </nav>
+
+            <!-- 배송원 리스트 영역 -->
+            <section class="p-4 sm:p-6 space-y-4 flex-1">
+                <div id="driver-list-container" class="space-y-4">
+                    <!-- JS로 배송원 카드 렌더링 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- 하단 푸터 -->
+        <footer class="py-4 px-6 border-t border-slate-200 bg-slate-50 text-center text-xs text-slate-400">
+            약국-배송원 실시간 연동 시스템 • 데이터는 브라우저에 안전하게 자동 저장됩니다.
+        </footer>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 인증사진 크게보기 모달                                                 -->
+    <!-- ===================================================================== -->
+    <div id="photo-modal" onclick="closePhotoModal()" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div onclick="event.stopPropagation()" class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
+            <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <h3 id="modal-photo-title" class="font-bold text-slate-900 text-sm sm:text-base">배송 완료 인증사진</h3>
+                <button onclick="closePhotoModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="bg-slate-950 flex items-center justify-center">
+                <img id="modal-photo-img" src="" alt="인증사진 확대" class="max-h-[65vh] w-auto object-contain">
+            </div>
+            <div class="px-5 py-3 bg-slate-50 text-xs text-slate-600 font-medium" id="modal-photo-desc"></div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 배송완료 문자(SMS/MMS) 원터치 전송 모달                               -->
+    <!-- ===================================================================== -->
+    <div id="sms-send-modal" onclick="closeSmsModal()" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div onclick="event.stopPropagation()" class="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/70">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">💬</span>
+                    <h3 class="font-bold text-slate-900 text-base">배송완료 문자 전송</h3>
+                </div>
+                <button onclick="closeSmsModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <!-- 수신자 번호 및 인증사진 미리보기 -->
+                <div class="flex items-center gap-3.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <img id="sms-modal-photo" src="" alt="인증사진" class="w-16 h-16 rounded-lg object-cover border border-slate-300 shrink-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-semibold text-slate-500">받는 사람 (손님 연락처)</div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span id="sms-modal-phone" class="text-base font-mono font-extrabold text-emerald-700">010-0000-0000</span>
+                            <button onclick="copySmsPhoneNumber()" class="px-2 py-0.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-md">
+                                번호복사
+                            </button>
+                        </div>
+                        <div id="sms-modal-name" class="text-xs text-slate-500 mt-0.5 truncate"></div>
+                    </div>
+                </div>
+
+                <!-- 전송 문구 미리보기 -->
+                <div>
+                    <div class="text-xs font-bold text-slate-600 mb-1">전송될 배송완료 문구</div>
+                    <div id="sms-modal-text" class="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs text-slate-800 whitespace-pre-line leading-relaxed font-medium"></div>
+                </div>
+
+                <!-- 전송 실행 버튼 2종 (상황에 맞춰 원터치 실행) -->
+                <div class="space-y-2.5 pt-1">
+                    <button onclick="launchDirectSmsWithPhone()" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex flex-col items-center justify-center">
+                        <span class="text-sm flex items-center gap-1.5">📱 손님 전화번호 + 완료문구 바로 입력해 문자창 열기</span>
+                        <span class="text-[11px] font-normal text-emerald-100 mt-0.5">받는 사람에 손님 전화번호 자동 입력 + 인증사진 갤러리 자동 저장</span>
+                    </button>
+
+                    <button onclick="launchShareWithPhotoAndText()" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-sm transition flex flex-col items-center justify-center">
+                        <span class="text-sm flex items-center gap-1.5">🖼️ 인증사진 + 완료문구 바로 첨부해 보내기 (번호 자동복사)</span>
+                        <span class="text-[11px] font-normal text-blue-100 mt-0.5">인증사진과 완료 문구가 한 번에 첨부되며 문자 앱을 바로 선택합니다</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 토스트 알림 메시지 박스 (alert() 대체)                                -->
+    <!-- ===================================================================== -->
+    <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-sm pointer-events-none"></div>
+
+    <script>
+        // 전역 상태 변수
+        const STORAGE_KEY = 'ocheon_pharmacy_deliveries_v1';
+        let reservations = [];
+        let currentMode = 'pharmacy';
+        let currentPharmacyTab = 'list';
+        let currentDriverTab = 'pending';
+        const pendingPhotos = {};
+        const editingPhotoIds = {};
+
+        /**
+         * 상단 모드 전환 (약국 모드 <-> 배송원 모드)
+         */
+        function switchMode(mode) {
+            currentMode = mode;
+            const viewPharmacy = document.getElementById('view-pharmacy');
+            const viewDriver = document.getElementById('view-driver');
+            const btnPharmacy = document.getElementById('btn-mode-pharmacy');
+            const btnDriver = document.getElementById('btn-mode-driver');
+            const headerIconBg = document.getElementById('header-icon-bg');
+            const headerSubtitle = document.getElementById('header-subtitle');
+
+            if (mode === 'pharmacy') {
+                viewPharmacy.classList.remove('hidden');
+                viewDriver.classList.add('hidden');
+                btnPharmacy.className = 'flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all bg-white text-emerald-700 shadow-sm';
+                btnDriver.className = 'flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700';
+                headerIconBg.className = 'w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm transition-colors duration-300';
+                headerSubtitle.textContent = '약국 관리자 및 고객 접수 모드';
+                headerSubtitle.className = 'text-xs font-medium text-emerald-600';
+                renderPharmacyList();
+            } else {
+                viewPharmacy.classList.add('hidden');
+                viewDriver.classList.remove('hidden');
+                btnDriver.className = 'flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all bg-white text-blue-700 shadow-sm';
+                btnPharmacy.className = 'flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700';
+                headerIconBg.className = 'w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm transition-colors duration-300';
+                headerSubtitle.textContent = '배송원 현장 배달 및 인증사진 업로드 모드';
+                headerSubtitle.className = 'text-xs font-medium text-blue-600';
+                renderDriverList();
+            }
+        }
+
+        /**
+         * 로컬 스토리지에서 예약 데이터 로드 (초기 접속 시 샘플 데이터 제공)
+         */
+        function loadData() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    reservations = JSON.parse(saved);
+                    return;
+                }
+            } catch (e) {
+                console.warn('데이터 로드 실패:', e);
+            }
+
+            const now = new Date();
+            const sample1 = new Date(now.getTime() - 45 * 60000).toISOString();
+            const sample2 = new Date(now.getTime() - 15 * 60000).toISOString();
+
+            reservations = [
+                {
+                    id: 'res-sample-1',
+                    datetime: sample1,
+                    name: '박성훈',
+                    rrn: '821103-1',
+                    phone: '010-2345-6789',
+                    address: '서울시 강남구 역삼로 210, 3층 오피스텔 302호 (문 앞 보관)',
+                    status: 'PENDING',
+                    photoData: null,
+                    completedAt: null
+                },
+                {
+                    id: 'res-sample-2',
+                    datetime: sample2,
+                    name: '김민지',
+                    rrn: '940512-2',
+                    phone: '010-8765-4321',
+                    address: '서울시 서초구 반포대로 45, 래미안아파트 103동 1204호',
+                    status: 'PENDING',
+                    photoData: null,
+                    completedAt: null
+                }
+            ];
+            saveData();
+        }
+
+        /**
+         * 로컬 스토리지에 예약 데이터 저장
+         */
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(reservations));
+            } catch (e) {
+                console.warn('데이터 저장 실패:', e);
+                showToast('저장 공간이 부족해 일부 데이터가 저장되지 않을 수 있습니다.', 'error');
+            }
+        }
+
+        /**
+         * 예약하기 탭 내부 서브 모드 전환 (신규 약배송 예약하기 <-> 내 예약 정보 수정하기)
+         */
+        function setReserveSubMode(subMode, preselectId = null) {
+            const btnNew = document.getElementById('subtab-reserve-new');
+            const btnEdit = document.getElementById('subtab-reserve-edit');
+            const selectorBox = document.getElementById('reserve-edit-selector-box');
+
+            const activeBtn = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold bg-white text-emerald-700 shadow-sm transition-all';
+            const inactiveBtn = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 transition-all';
+
+            if (subMode === 'edit') {
+                btnNew.className = inactiveBtn;
+                btnEdit.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold bg-white text-amber-700 shadow-sm transition-all';
+                selectorBox.classList.remove('hidden');
+                populateReserveCustomerDropdown(preselectId);
+            } else {
+                btnNew.className = activeBtn;
+                btnEdit.className = inactiveBtn;
+                selectorBox.classList.add('hidden');
+                resetReserveFormToNew();
+            }
+        }
+
+        /**
+         * 예약하기 탭 상단의 기존 손님 선택 드롭다운 채우기
+         */
+        function populateReserveCustomerDropdown(selectedId = null) {
+            const selectEl = document.getElementById('reserve-select-customer');
+            if (!selectEl) return;
+
+            const sorted = getSortedReservations('ASC');
+            selectEl.innerHTML = '<option value="">수정할 본인의 예약 건을 선택하세요</option>' +
+                sorted.map((item, idx) => `<option value="${item.id}">${idx + 1}. ${escapeHtml(item.name)} (${escapeHtml(item.phone || '번호없음')})</option>`).join('');
+
+            if (selectedId) {
+                selectEl.value = selectedId;
+                loadCustomerIntoReserveForm(selectedId);
+            } else if (sorted.length > 0) {
+                selectEl.value = sorted[0].id;
+                loadCustomerIntoReserveForm(sorted[0].id);
+            } else {
+                resetReserveFormToNew();
+            }
+        }
+
+        /**
+         * 선택한 기존 손님 정보를 예약하기 입력 폼에 불러오기
+         */
+        function loadCustomerIntoReserveForm(id) {
+            if (!id) {
+                resetReserveFormToNew();
+                return;
+            }
+            const item = reservations.find(r => r.id === id);
+            if (!item) return;
+
+            document.getElementById('reserve-edit-id').value = item.id;
+            document.getElementById('input-name').value = item.name || '';
+            document.getElementById('input-rrn').value = item.rrn || '';
+            updateRrnVisualGuide(item.rrn || '');
+            document.getElementById('input-phone').value = item.phone || '';
+            document.getElementById('input-address').value = item.address || '';
+
+            document.getElementById('reserve-mode-badge').textContent = '기존 정보 수정 모드';
+            document.getElementById('reserve-mode-badge').className = 'inline-block px-2.5 py-0.5 bg-amber-100 text-amber-800 text-xs font-bold rounded-lg mb-1';
+            document.getElementById('reserve-form-heading').textContent = `${item.name}님 약배송 정보 수정`;
+            document.getElementById('reserve-form-desc').textContent = '변경할 내용을 수정한 뒤 아래 [수정 내용 저장하기] 버튼을 눌러주세요.';
+            document.getElementById('btn-submit-reservation-text').textContent = '수정 내용 저장하기';
+            document.getElementById('btn-cancel-reserve-edit').classList.remove('hidden');
+        }
+
+        /**
+         * 예약하기 입력 폼을 신규 등록 상태로 초기화
+         */
+        function resetReserveFormToNew() {
+            const selectEl = document.getElementById('reserve-select-customer');
+            if (selectEl) selectEl.value = '';
+
+            document.getElementById('reserve-edit-id').value = '';
+            document.getElementById('input-name').value = '';
+            document.getElementById('input-rrn').value = '';
+            updateRrnVisualGuide('');
+            document.getElementById('input-phone').value = '';
+            document.getElementById('input-address').value = '';
+
+            document.getElementById('reserve-mode-badge').textContent = '신규 예약 등록';
+            document.getElementById('reserve-mode-badge').className = 'inline-block px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg mb-1';
+            document.getElementById('reserve-form-heading').textContent = '약배송 정보 입력';
+            document.getElementById('reserve-form-desc').textContent = '정확한 처방약 배송을 위해 아래 항목을 빠짐없이 입력해 주세요.';
+            document.getElementById('btn-submit-reservation-text').textContent = '예약 정보 저장하기';
+            document.getElementById('btn-cancel-reserve-edit').classList.add('hidden');
+        }
+
+        /**
+         * 주민등록번호 7자리 자동 하이픈 (000000-0 형식) 및 실시간 가이드 동기화
+         */
+        function formatRRN(input) {
+            const digits = input.value.replace(/[^0-9]/g, '').slice(0, 7);
+            if (digits.length > 6) {
+                input.value = `${digits.slice(0, 6)}-${digits.slice(6)}`;
+            } else {
+                input.value = digits;
+            }
+            updateRrnVisualGuide(input.value);
+        }
+
+        function updateRrnVisualGuide(val) {
+            const template = '000000-0';
+            const mirror = document.getElementById('rrn-typed-mirror');
+            const tail = document.getElementById('rrn-placeholder-tail');
+            if (!mirror || !tail) return;
+            mirror.textContent = val;
+            tail.textContent = template.slice(val.length);
+        }
+
+        /**
+         * 휴대폰 번호 자동 하이픈 (010-0000-0000 형식)
+         */
+        function formatPhone(input) {
+            const digits = input.value.replace(/[^0-9]/g, '').slice(0, 11);
+            if (digits.length <= 3) {
+                input.value = digits;
+            } else if (digits.length <= 7) {
+                input.value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+            } else {
+                input.value = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+            }
+        }
+
+        /**
+         * 약국 모드 서브 탭 전환 (목록 <-> 예약하기)
+         */
+        function switchPharmacyTab(tab, editTargetId = null) {
+            currentPharmacyTab = tab;
+            const secList = document.getElementById('section-pharmacy-list');
+            const secReserve = document.getElementById('section-pharmacy-reserve');
+            const tabList = document.getElementById('tab-pharmacy-list');
+            const tabReserve = document.getElementById('tab-pharmacy-reserve');
+
+            const activeClass = 'py-3.5 text-xs sm:text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 bg-white transition-all flex items-center justify-center gap-1.5';
+            const inactiveClass = 'py-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-all flex items-center justify-center gap-1.5';
+
+            secList.classList.add('hidden');
+            secReserve.classList.add('hidden');
+            tabList.className = inactiveClass;
+            tabReserve.className = inactiveClass;
+
+            if (tab === 'list') {
+                secList.classList.remove('hidden');
+                tabList.className = activeClass;
+                renderPharmacyList();
+            } else if (tab === 'reserve') {
+                secReserve.classList.remove('hidden');
+                tabReserve.className = activeClass;
+                if (editTargetId) {
+                    setReserveSubMode('edit', editTargetId);
+                } else {
+                    setReserveSubMode('new');
+                }
+            }
+        }
+
+        /**
+         * 예약 날짜/시간 순 정렬 헬퍼
+         */
+        function getSortedReservations(order = 'ASC') {
+            return [...reservations].sort((a, b) => {
+                const tA = new Date(a.datetime).getTime();
+                const tB = new Date(b.datetime).getTime();
+                return order === 'ASC' ? tA - tB : tB - tA;
+            });
+        }
+
+        /**
+         * 날짜/시간 포맷팅 (예: 11월 13일 (금) 01:43)
+         */
+        function formatDisplayDateTime(dtStr) {
+            if (!dtStr) return '';
+            const d = new Date(dtStr);
+            if (isNaN(d.getTime())) return dtStr;
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            const month = d.getMonth() + 1;
+            const date = d.getDate();
+            const dayName = days[d.getDay()];
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return `${month}월 ${date}일 (${dayName}) ${hh}:${mm}`;
+        }
+
+        /**
+         * 토스트 알림 표시
+         */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const colors = {
+                success: 'bg-emerald-700 text-white',
+                error: 'bg-rose-600 text-white',
+                info: 'bg-slate-800 text-white'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${colors[type] || colors.info} px-4 py-3 rounded-xl shadow-lg text-xs sm:text-sm font-bold text-center transition-all duration-300`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        /**
+         * 전체 UI 렌더링 갱신
+         */
+        function renderAll() {
+            renderPharmacyList();
+            renderDriverList();
+        }
+
+        /**
+         * [약국 모드] 첨부 이미지 스타일의 가독성 높은 카드 목록 렌더링 (날짜/시간 오름차순)
+         */
+        function renderPharmacyList() {
+            const container = document.getElementById('pharmacy-list-container');
+            const badge = document.getElementById('pharmacy-badge-count');
+            const filterVal = document.getElementById('filter-status').value;
+
+            const sorted = getSortedReservations('ASC');
+            badge.textContent = reservations.length;
+
+            const filtered = sorted.filter(item => {
+                if (filterVal === 'ALL') return true;
+                return item.status === filterVal;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-14 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                        <div class="text-3xl mb-2">📋</div>
+                        <p class="text-sm font-bold text-slate-600">표시할 예약 내역이 없습니다.</p>
+                        <p class="text-xs text-slate-400 mt-1">'예약하기 (고객입력)' 탭에서 정보를 등록해보세요.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map((item, idx) => {
+                const isDone = item.status === 'COMPLETED';
+                const rowNumber = idx + 1;
+
+                return `
+                    <article class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm transition-all hover:border-slate-300 space-y-3.5">
+                        <!-- 카드 상단 헤더: 순번 뱃지 + 날짜/시간 | 상태 뱃지 + 삭제 버튼 -->
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-7 h-7 rounded-lg bg-slate-800 text-white text-xs font-extrabold flex items-center justify-center shrink-0">
+                                    ${rowNumber}
+                                </span>
+                                <span class="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    ${formatDisplayDateTime(item.datetime)}
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                ${isDone ? `
+                                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                                        ✅ 배송완료
+                                    </span>
+                                ` : `
+                                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100/90 text-amber-800 text-xs font-bold">
+                                        ⏳ 배송대기
+                                    </span>
+                                `}
+                                <button onclick="switchPharmacyTab('reserve', '${item.id}')" title="고객 정보 수정" class="px-2 py-1 text-xs font-bold text-slate-600 hover:text-amber-700 hover:bg-amber-50 border border-slate-200 rounded-lg transition">
+                                    수정
+                                </button>
+                                <button onclick="deleteReservation('${item.id}')" title="예약 삭제" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 고객 입력 정보 박스 그리드 (1. 고객 성함 / 2. 주민등록번호 / 3. 연락처 / 4. 배송지 주소) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div class="bg-slate-50/90 border border-slate-100 rounded-xl px-3.5 py-2.5">
+                                <span class="text-[11px] font-semibold text-slate-400 block mb-0.5">1. 고객 성함</span>
+                                <span class="text-sm sm:text-base font-bold text-slate-900">${escapeHtml(item.name)}</span>
+                            </div>
+                            <div class="bg-slate-50/90 border border-slate-100 rounded-xl px-3.5 py-2.5">
+                                <span class="text-[11px] font-semibold text-slate-400 block mb-0.5">2. 주민등록번호 (7자리)</span>
+                                <span class="text-sm sm:text-base font-mono font-bold text-slate-900 tracking-wider">${escapeHtml(item.rrn)}••••••</span>
+                            </div>
+                            <div class="sm:col-span-2 bg-slate-50/90 border border-slate-100 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2">
+                                <div>
+                                    <span class="text-[11px] font-semibold text-slate-400 block mb-0.5">3. 연락처</span>
+                                    <a href="tel:${escapeHtml(item.phone || '')}" class="text-sm font-mono font-bold text-emerald-700 hover:underline">${escapeHtml(item.phone || '미등록')}</a>
+                                </div>
+                                ${isDone ? `
+                                    <button onclick="sendSmsDeliveryComplete('${item.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition shrink-0">
+                                        💬 완료 문자 전송
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="sm:col-span-2 bg-slate-50/90 border border-slate-100 rounded-xl px-3.5 py-2.5">
+                                <span class="text-[11px] font-semibold text-slate-400 block mb-0.5">4. 배송지 주소</span>
+                                <p class="text-sm font-bold text-slate-800 leading-snug break-keep">${escapeHtml(item.address)}</p>
+                            </div>
+                        </div>
+
+                        <!-- 배송 완료된 경우 하단 인증사진 바 -->
+                        ${isDone && item.photoData ? `
+                            <div class="flex items-center justify-between gap-3 bg-emerald-50/80 border border-emerald-200 px-3.5 py-2.5 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <img src="${item.photoData}" alt="배송 인증사진" onclick="openPhotoModal('${item.id}')" class="w-12 h-12 rounded-lg object-cover border border-emerald-300 cursor-pointer shrink-0">
+                                    <div>
+                                        <p class="text-xs font-bold text-emerald-900">📸 배송 완료 인증사진 등록됨</p>
+                                        <p class="text-[11px] text-emerald-700 mt-0.5">완료시각: ${item.completedAt || '-'}</p>
+                                    </div>
+                                </div>
+                                <button onclick="openPhotoModal('${item.id}')" class="px-3 py-1.5 bg-white border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg hover:bg-emerald-50 transition shrink-0">
+                                    사진 크게보기
+                                </button>
+                            </div>
+                        ` : ''}
+                    </article>
+                `;
+            }).join('');
+        }
+
+        /**
+         * 인증사진과 '오천약국에서 배송을 완료하였습니다' 문구를 고객 연락처 문자(SMS/MMS)로 전송
+         * - 최초 완료 및 사진 수정 후 재전송 모두 최신 인증사진 + 손님 전화번호 + 완료 문구 3가지를 항상 동시 처리
+         */
+        let activeSmsTargetId = null;
+
+        async function sendSmsDeliveryComplete(id) {
+            const item = reservations.find(r => r.id === id);
+            if (!item || !item.photoData) {
+                showToast('전송할 인증사진이 없습니다.', 'error');
+                return;
+            }
+
+            activeSmsTargetId = id;
+            const cleanPhone = (item.phone || '').replace(/[^0-9]/g, '');
+            const messageText = `[오천약국 약배송 안내]\n${item.name}님, 오천약국에서 배송을 완료하였습니다.\n\n• 배송지: ${item.address}\n• 완료시각: ${item.completedAt || ''}`;
+
+            document.getElementById('sms-modal-photo').src = item.photoData;
+            document.getElementById('sms-modal-phone').textContent = item.phone || '번호 미등록';
+            document.getElementById('sms-modal-name').textContent = `고객명: ${item.name} • 완료: ${item.completedAt || '-'}`;
+            document.getElementById('sms-modal-text').textContent = messageText;
+            document.getElementById('sms-send-modal').classList.remove('hidden');
+
+            // 1. 손님 전화번호 클립보드 자동 복사
+            copyTextToClipboard(item.phone || '');
+
+            // 2. 최신(수정된) 인증사진 파일 생성 및 Web Share(사진+문구 동시 첨부) 우선 실행
+            try {
+                const res = await fetch(item.photoData);
+                const blob = await res.blob();
+                const imageFile = new File([blob], `오천약국_배송인증_${item.name}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+                if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                    showToast(`손님 번호(${item.phone}) 복사 완료! 메시지 앱을 선택해 사진과 문구를 바로 전송하세요.`, 'success');
+                    await navigator.share({
+                        files: [imageFile],
+                        title: '오천약국 배송 완료 안내',
+                        text: messageText
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.warn('Web Share 미지원/실패, 직통 SMS 모드로 전환:', err);
+            }
+
+            // 3. Web Share 미지원 브라우저/PC에서는 최신 인증사진 자동 저장 + 손님 번호·완료문구 직통 문자창 실행
+            try {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = item.photoData;
+                downloadLink.download = `오천약국_배송인증_${item.name}_${Date.now()}.jpg`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            } catch (e) {
+                console.error('사진 저장 실패:', e);
+            }
+
+            if (cleanPhone) {
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const smsSeparator = isIOS ? '&' : '?';
+                const smsUrl = `sms:${cleanPhone}${smsSeparator}body=${encodeURIComponent(messageText)}`;
+                setTimeout(() => {
+                    window.location.href = smsUrl;
+                }, 200);
+                showToast(`수신번호(${item.phone})와 완료문구가 입력된 문자창을 엽니다. 저장된 인증사진을 첨부해주세요!`, 'success');
+            } else {
+                showToast('등록된 손님 전화번호가 없습니다. 예약하기 > 수정 탭에서 번호를 입력해주세요.', 'error');
+            }
+        }
+
+        function closeSmsModal() {
+            document.getElementById('sms-send-modal').classList.add('hidden');
+        }
+
+        function copyTextToClipboard(text) {
+            if (!text) return;
+            try {
+                const tempInput = document.createElement('input');
+                tempInput.value = text;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+            } catch (e) {
+                console.warn('클립보드 복사 실패:', e);
+            }
+        }
+
+        function copySmsPhoneNumber() {
+            const item = reservations.find(r => r.id === activeSmsTargetId);
+            if (item && item.phone) {
+                copyTextToClipboard(item.phone);
+                showToast(`손님 전화번호(${item.phone})가 복사되었습니다.`, 'success');
+            }
+        }
+
+        /**
+         * 방법 A: 손님 전화번호가 받는 사람 칸에 바로 입력된 문자창 열기 + 인증사진 기기 저장
+         */
+        function launchDirectSmsWithPhone() {
+            const item = reservations.find(r => r.id === activeSmsTargetId);
+            if (!item) return;
+
+            const cleanPhone = (item.phone || '').replace(/[^0-9]/g, '');
+            const messageText = `[오천약국 약배송 안내]\n${item.name}님, 오천약국에서 배송을 완료하였습니다.\n\n• 배송지: ${item.address}\n• 완료시각: ${item.completedAt || ''}`;
+
+            // 인증사진을 갤러리/다운로드 폴더에 자동 저장하여 문자창 '+' 버튼에서 즉시 첨부 가능하게 함
+            if (item.photoData) {
+                try {
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = item.photoData;
+                    downloadLink.download = `오천약국_배송인증_${item.name}.jpg`;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                } catch (e) {
+                    console.error('사진 저장 실패:', e);
+                }
+            }
+
+            closeSmsModal();
+
+            if (cleanPhone) {
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const smsSeparator = isIOS ? '&' : '?';
+                const smsUrl = `sms:${cleanPhone}${smsSeparator}body=${encodeURIComponent(messageText)}`;
+                window.location.href = smsUrl;
+                showToast(`${item.phone} 번호와 완료 문구가 입력된 문자창을 열었습니다! 저장된 인증사진을 첨부해 전송하세요.`, 'success');
+            } else {
+                showToast('등록된 고객 연락처가 없습니다. 정보수정 탭에서 번호를 입력해주세요.', 'error');
+            }
+        }
+
+        /**
+         * 방법 B: 모바일 시스템 공유(Web Share)로 인증사진 파일 + 완료 문구를 한 번에 문자 앱으로 전달
+         */
+        async function launchShareWithPhotoAndText() {
+            const item = reservations.find(r => r.id === activeSmsTargetId);
+            if (!item || !item.photoData) return;
+
+            const messageText = `[오천약국 약배송 안내]\n${item.name}님, 오천약국에서 배송을 완료하였습니다.\n\n• 배송지: ${item.address}\n• 완료시각: ${item.completedAt || ''}`;
+            copyTextToClipboard(item.phone || '');
+
+            try {
+                const res = await fetch(item.photoData);
+                const blob = await res.blob();
+                const imageFile = new File([blob], `오천약국_배송인증_${item.name}.jpg`, { type: 'image/jpeg' });
+
+                if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                    closeSmsModal();
+                    showToast(`손님 번호(${item.phone}) 복사 완료! 문자 앱을 선택하고 받는 사람에 붙여넣으세요.`, 'success');
+                    await navigator.share({
+                        files: [imageFile],
+                        title: '오천약국 배송 완료 안내',
+                        text: messageText
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.warn('Web Share 미지원 또는 실패:', err);
+            }
+
+            // Web Share 미지원 기기에서는 자동으로 방법 A 실행
+            launchDirectSmsWithPhone();
+        }
+
+        /**
+         * 배송원 모드 서브 탭 전환 (배송 대기 <-> 전체 내역)
+         */
+        function switchDriverTab(tab) {
+            currentDriverTab = tab;
+            const tabPending = document.getElementById('tab-driver-pending');
+            const tabAll = document.getElementById('tab-driver-all');
+            const activeClass = 'py-3.5 text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-700 bg-white transition-all flex items-center justify-center gap-1.5';
+            const inactiveClass = 'py-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-all flex items-center justify-center gap-1.5';
+
+            if (tab === 'pending') {
+                tabPending.className = activeClass;
+                tabAll.className = inactiveClass;
+            } else {
+                tabPending.className = inactiveClass;
+                tabAll.className = activeClass;
+            }
+            renderDriverList();
+        }
+
+        /**
+         * 신규 예약 저장 또는 기존 예약 수정 (약국 모드 - 예약하기 탭 통합 처리)
+         */
+        function handleReservationSubmit(event) {
+            event.preventDefault();
+            const editId = document.getElementById('reserve-edit-id').value;
+            const name = document.getElementById('input-name').value.trim();
+            const rrnRaw = document.getElementById('input-rrn').value.trim();
+            const rrnDigits = rrnRaw.replace(/[^0-9]/g, '');
+            const phone = document.getElementById('input-phone').value.trim();
+            const address = document.getElementById('input-address').value.trim();
+
+            if (!name || rrnDigits.length !== 7 || phone.replace(/[^0-9]/g, '').length < 10 || !address) {
+                showToast('이름, 주민번호 7자리, 연락처, 배송지를 모두 정확히 입력해주세요.', 'error');
+                return;
+            }
+
+            if (editId) {
+                const idx = reservations.findIndex(r => r.id === editId);
+                if (idx !== -1) {
+                    reservations[idx].name = name;
+                    reservations[idx].rrn = `${rrnDigits.slice(0, 6)}-${rrnDigits.slice(6)}`;
+                    reservations[idx].phone = phone;
+                    reservations[idx].address = address;
+                    saveData();
+                    resetReserveFormToNew();
+                    renderAll();
+                    showToast(`${name}님의 예약 정보가 수정되었습니다!`, 'success');
+                    switchPharmacyTab('list');
+                    return;
+                }
+            }
+
+            const newItem = {
+                id: 'res-' + Date.now(),
+                datetime: new Date().toISOString(),
+                name,
+                rrn: `${rrnDigits.slice(0, 6)}-${rrnDigits.slice(6)}`,
+                phone,
+                address,
+                status: 'PENDING',
+                photoData: null,
+                completedAt: null
+            };
+
+            reservations.push(newItem);
+            saveData();
+            resetReserveFormToNew();
+            renderAll();
+            showToast(`${name}님의 약배송 예약이 등록되었습니다!`, 'success');
+            switchPharmacyTab('list');
+        }
+
+        /**
+         * [배송원 모드] 배달 대상 카드 렌더링
+         */
+        function renderDriverList() {
+            const container = document.getElementById('driver-list-container');
+            const pendingBadge = document.getElementById('driver-pending-count');
+            if (!container) return;
+
+            const sorted = getSortedReservations('ASC');
+            const pendingCount = sorted.filter(item => item.status === 'PENDING').length;
+            if (pendingBadge) pendingBadge.textContent = pendingCount;
+
+            const targetList = currentDriverTab === 'pending'
+                ? sorted.filter(item => item.status === 'PENDING')
+                : sorted;
+
+            if (targetList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-14 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                        <div class="text-3xl mb-2">🛵</div>
+                        <p class="text-sm font-bold text-slate-600">${currentDriverTab === 'pending' ? '현재 대기 중인 배송 건이 없습니다.' : '등록된 배송 내역이 없습니다.'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = targetList.map((item) => {
+                const previewImg = pendingPhotos[item.id];
+                const isDone = item.status === 'COMPLETED';
+                const isEditingPhoto = !!editingPhotoIds[item.id];
+
+                return `
+                    <article class="bg-white border-2 ${isDone ? 'border-emerald-200' : 'border-blue-100'} rounded-2xl overflow-hidden shadow-sm">
+                        <!-- 상단: 예약 탭 (손님이 입력한 정보 영역) -->
+                        <div class="p-4 sm:p-5 bg-white">
+                            <div class="flex items-center justify-between gap-2 mb-3">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+                                    📋 예약 정보 (고객 입력)
+                                </span>
+                                <span class="text-xs font-bold text-slate-500">🕒 ${formatDisplayDateTime(item.datetime)}</span>
+                            </div>
+
+                            <div class="space-y-2.5">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    <div class="text-base font-bold text-slate-900">1. ${escapeHtml(item.name)}</div>
+                                    <div class="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">2. 주민번호: ${escapeHtml(item.rrn)}••••••</div>
+                                    ${item.phone ? `
+                                        <a href="tel:${escapeHtml(item.phone)}" class="inline-flex items-center gap-1 text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-lg hover:bg-emerald-100 transition">
+                                            📞 3. ${escapeHtml(item.phone)}
+                                        </a>
+                                    ` : ''}
+                                </div>
+                                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/70">
+                                    <div class="text-xs font-bold text-slate-500 mb-0.5">4. 배송지 주소</div>
+                                    <div class="text-sm font-bold text-slate-900 leading-snug">${escapeHtml(item.address)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 하단: 4) 배송 탭 (배송완료 후 인증사진 찍어 올리기 및 수정 영역) -->
+                        <div class="p-4 sm:p-5 bg-slate-50 border-t border-slate-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                                    <span class="px-2 py-0.5 rounded bg-blue-600 text-white text-xs">4) 배송</span>
+                                    배송완료 인증사진 업로드
+                                </span>
+                                ${isDone ? `<span class="text-xs font-bold text-emerald-600">완료됨 (${item.completedAt})</span>` : ''}
+                            </div>
+
+                            <input type="file" id="camera-input-${item.id}" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoCapture(event, '${item.id}')">
+
+                            ${isDone && !isEditingPhoto ? `
+                                <!-- 이미 완료된 경우: 인증사진 확인 / 사진 수정(취소 후 재업로드) / 문자 바로 전송 -->
+                                <div class="space-y-3 bg-white p-3.5 rounded-xl border border-emerald-200">
+                                    <div class="flex items-center gap-4">
+                                        <img src="${item.photoData}" alt="배송완료 인증사진" onclick="openPhotoModal('${item.id}')" class="w-20 h-20 rounded-xl object-cover border border-slate-200 cursor-pointer shrink-0">
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-bold text-emerald-800">인증사진 업로드 완료</p>
+                                            <p class="text-xs text-slate-500 mt-1">수신번호: <strong class="font-mono text-slate-700">${escapeHtml(item.phone || '미등록')}</strong></p>
+                                            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                                                <button onclick="openPhotoModal('${item.id}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition">
+                                                    크게 보기
+                                                </button>
+                                                <button onclick="startEditCompletedPhoto('${item.id}')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold rounded-lg transition">
+                                                    ✏️ 사진 수정/재업로드
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onclick="sendSmsDeliveryComplete('${item.id}')" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                        고객 번호로 완료 문자 전송 (${escapeHtml(item.phone || '번호없음')})
+                                    </button>
+                                </div>
+                            ` : isDone && isEditingPhoto ? `
+                                <!-- 완료된 건의 사진 수정 모드 (기존 사진 취소 및 새 사진 업로드) -->
+                                <div class="space-y-3 bg-amber-50/70 p-3.5 rounded-xl border-2 border-amber-300">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-amber-900">🔄 인증사진 수정 모드</span>
+                                        <button onclick="cancelEditCompletedPhoto('${item.id}')" class="text-xs font-bold text-slate-500 hover:text-slate-800 underline">
+                                            수정 취소
+                                        </button>
+                                    </div>
+                                    ${previewImg ? `
+                                        <div class="relative rounded-xl overflow-hidden border-2 border-blue-400 bg-slate-900">
+                                            <img src="${previewImg}" alt="새 인증사진 미리보기" class="w-full max-h-60 object-contain mx-auto">
+                                            <div class="absolute bottom-2.5 right-2.5 flex items-center gap-1.5">
+                                                <button onclick="clearPendingPhoto('${item.id}')" class="px-3 py-1.5 bg-rose-600/90 text-white text-xs font-bold rounded-lg backdrop-blur-sm hover:bg-rose-600">
+                                                    ✕ 사진 취소
+                                                </button>
+                                                <button onclick="triggerCamera('${item.id}')" class="px-3 py-1.5 bg-slate-900/85 text-white text-xs font-bold rounded-lg backdrop-blur-sm hover:bg-slate-900">
+                                                    🔄 다시 찍기
+                                                </button>
+                                            </div>
+                                        <button onclick="saveUpdatedPhoto('${item.id}', true)" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex flex-col items-center justify-center gap-0.5">
+                                            <span class="text-sm">✅ 수정된 인증사진 저장 + 고객 문자 재전송</span>
+                                            <span class="text-[11px] font-normal text-emerald-100">수신번호(${escapeHtml(item.phone || '번호없음')}) · 수정된 사진 · 완료문구 즉시 연결</span>
+                                        </button>
+                                    ` : `
+                                        <button onclick="triggerCamera('${item.id}')" class="w-full py-4 px-4 bg-white hover:bg-amber-50 border-2 border-dashed border-amber-400 text-amber-900 font-bold rounded-xl transition flex flex-col items-center justify-center gap-1">
+                                            <span class="text-sm">📷 새 인증사진 찍기 / 선택하기</span>
+                                            <span class="text-[11px] font-normal text-slate-500">기존 사진을 대체할 새 사진을 촬영해주세요</span>
+                                        </button>
+                                        <button onclick="revertToPending('${item.id}')" class="w-full py-2.5 px-4 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold rounded-xl transition text-xs">
+                                            🗑️ 업로드 취소하고 배송대기 상태로 되돌리기
+                                        </button>
+                                    `}
+                                </div>
+                            ` : `
+                                <!-- 배송 대기 중인 경우: 카메라 촬영 / 앨범 선택 & 취소 / 완료 전송 -->
+                                <div class="space-y-3">
+                                    ${previewImg ? `
+                                        <div class="relative rounded-xl overflow-hidden border-2 border-blue-400 bg-slate-900">
+                                            <img src="${previewImg}" alt="촬영 미리보기" class="w-full max-h-60 object-contain mx-auto">
+                                            <div class="absolute bottom-2.5 right-2.5 flex items-center gap-1.5">
+                                                <button onclick="clearPendingPhoto('${item.id}')" class="px-3 py-1.5 bg-rose-600/90 text-white text-xs font-bold rounded-lg backdrop-blur-sm hover:bg-rose-600">
+                                                    ✕ 업로드 취소
+                                                </button>
+                                                <button onclick="triggerCamera('${item.id}')" class="px-3 py-1.5 bg-slate-900/85 text-white text-xs font-bold rounded-lg backdrop-blur-sm hover:bg-slate-900">
+                                                    🔄 다시 찍기
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <button onclick="completeDelivery('${item.id}', true)" class="w-full py-4 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-md shadow-emerald-600/25 transition flex flex-col items-center justify-center gap-0.5">
+                                            <span class="text-sm sm:text-base flex items-center gap-2">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                                인증사진 등록 + 배송완료 + 고객 문자 전송 한 번에 하기
+                                            </span>
+                                            <span class="text-[11px] font-normal text-emerald-100">
+                                                수신번호(${escapeHtml(item.phone || '번호없음')}) · 인증사진 · 완료문구 즉시 연결
+                                            </span>
+                                        </button>
+                                    ` : `
+                                        <button onclick="triggerCamera('${item.id}')" class="w-full py-4 px-4 bg-white hover:bg-blue-50 border-2 border-dashed border-blue-300 text-blue-700 font-bold rounded-xl transition flex flex-col items-center justify-center gap-1.5">
+                                            <span class="text-sm">📷 배송완료 인증사진 찍기 / 앨범 선택</span>
+                                            <span class="text-[11px] font-normal text-slate-500">사진을 올리면 완료 및 고객 문자 전송 버튼이 활성화됩니다</span>
+                                        </button>
+                                    `}
+                                </div>
+                            `}
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        /**
+         * 카메라 또는 앨범 파일 선택창 실행
+         */
+        function triggerCamera(id) {
+            const input = document.getElementById(`camera-input-${id}`);
+            if (input) input.click();
+        }
+
+        /**
+         * 촬영/업로드 대기 중인 사진 취소
+         */
+        function clearPendingPhoto(id) {
+            delete pendingPhotos[id];
+            const input = document.getElementById(`camera-input-${id}`);
+            if (input) input.value = '';
+            renderDriverList();
+            showToast('업로드한 사진이 취소되었습니다. 다시 촬영할 수 있습니다.', 'info');
+        }
+
+        /**
+         * 배송 완료된 건의 인증사진 수정 모드 진입/취소/저장/되돌리기
+         */
+        function startEditCompletedPhoto(id) {
+            editingPhotoIds[id] = true;
+            delete pendingPhotos[id];
+            renderDriverList();
+        }
+
+        function cancelEditCompletedPhoto(id) {
+            delete editingPhotoIds[id];
+            delete pendingPhotos[id];
+            renderDriverList();
+        }
+
+        function saveUpdatedPhoto(id, sendSmsAfter = false) {
+            const newPhoto = pendingPhotos[id];
+            if (!newPhoto) {
+                showToast('새로 촬영한 인증사진이 없습니다.', 'error');
+                return;
+            }
+            const targetIndex = reservations.findIndex(item => item.id === id);
+            if (targetIndex === -1) return;
+
+            const now = new Date();
+            const timeStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            reservations[targetIndex].photoData = newPhoto;
+            reservations[targetIndex].completedAt = timeStr;
+            delete pendingPhotos[id];
+            delete editingPhotoIds[id];
+            saveData();
+            renderAll();
+
+            if (sendSmsAfter) {
+                sendSmsDeliveryComplete(id);
+            } else {
+                showToast('인증사진이 새 사진으로 수정되었습니다!', 'success');
+            }
+        }
+
+        function revertToPending(id) {
+            const targetIndex = reservations.findIndex(item => item.id === id);
+            if (targetIndex === -1) return;
+
+            reservations[targetIndex].status = 'PENDING';
+            reservations[targetIndex].photoData = null;
+            reservations[targetIndex].completedAt = null;
+            delete pendingPhotos[id];
+            delete editingPhotoIds[id];
+            saveData();
+            renderAll();
+            showToast('사진 업로드가 취소되고 배송대기 상태로 변경되었습니다.', 'info');
+        }
+
+        /**
+         * 배송 완료 확정 및 인증사진 업로드 저장 (선택 시 고객 연락처로 문자 바로 전송 연계)
+         */
+        function completeDelivery(id, sendSmsAfter = false) {
+            const photoData = pendingPhotos[id];
+            if (!photoData) {
+                showToast('먼저 배송 완료 인증사진을 찍어 올려주세요.', 'error');
+                return;
+            }
+
+            const targetIndex = reservations.findIndex(item => item.id === id);
+            if (targetIndex === -1) return;
+
+            const now = new Date();
+            const timeStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            reservations[targetIndex].status = 'COMPLETED';
+            reservations[targetIndex].photoData = photoData;
+            reservations[targetIndex].completedAt = timeStr;
+
+            delete pendingPhotos[id];
+            saveData();
+            renderAll();
+
+            if (sendSmsAfter) {
+                sendSmsDeliveryComplete(id);
+            } else {
+                showToast('인증사진 등록 및 배송완료 처리되었습니다!', 'success');
+            }
+        }
+
+        /**
+         * 촬영된 이미지 압축 및 미리보기 저장 (localStorage 용량 최적화)
+         */
+        function handlePhotoCapture(event, id) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Canvas를 이용해 최대 너비 800px로 리사이징 및 JPEG 압축
+                    const canvas = document.createElement('canvas');
+                    const maxWidth = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 압축된 Base64 이미지 저장
+                    pendingPhotos[id] = canvas.toDataURL('image/jpeg', 0.75);
+                    renderDriverList();
+                    showToast('인증사진이 준비되었습니다. 아래 완료 버튼을 눌러주세요.', 'info');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * 예약 건 삭제
+         */
+        function deleteReservation(id) {
+            reservations = reservations.filter(item => item.id !== id);
+            delete pendingPhotos[id];
+            delete editingPhotoIds[id];
+            saveData();
+            renderAll();
+            showToast('해당 예약 내역이 삭제되었습니다.', 'info');
+        }
+
+        /**
+         * 인증사진 확대 모달 열기/닫기
+         */
+        function openPhotoModal(id) {
+            const item = reservations.find(r => r.id === id);
+            if (!item || !item.photoData) return;
+
+            document.getElementById('modal-photo-title').textContent = `${item.name}님 배송 완료 인증사진`;
+            document.getElementById('modal-photo-img').src = item.photoData;
+            document.getElementById('modal-photo-desc').textContent = `배송지: ${item.address} (완료: ${item.completedAt})`;
+            document.getElementById('photo-modal').classList.remove('hidden');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photo-modal').classList.add('hidden');
+        }
+
+        /**
+         * XSS 방지용 HTML 이스케이프
+         */
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        /**
+         * 앱 최초 실행 시 데이터 로드 및 화면 초기화
+         */
+        window.onload = function() {
+            loadData();
+            renderAll();
+        };
+    </script>
+</body>
+</html>
